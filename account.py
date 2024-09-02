@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def write_in_file(access_token, refresh_token):
-    file_path = "C:\\Users\\Ben's PC\\Documents\\Charles_Schwab_Python\\access_token_text"
+    file_path = os.getenv("FILE_PATH")
     f = open(file_path, "w")
     f.write(f"{access_token}\n{refresh_token}")
     f.close()
