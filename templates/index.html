@@ -1,7 +1,104 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order Form with Tables</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h2 {
+            text-align: center;
+            color: #4CAF50;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 45%;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin: 10px 0 5px;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        input[type="number"] {
+            width: 90%;
+            padding: 5px;
+            margin-right: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+
+        .order-tables {
+            width: 50%;
+            padding: 0 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .checkbox-container label {
+            margin-right: 10px;
+        }
+    </style>
     <script>
         function addCheckboxes() {
             fetch('http://127.0.0.1:5000/getAccountNames')
@@ -10,7 +107,6 @@
                     const accountNames = Object.keys(accountNamesDict);
                     const form = document.getElementById('orderForm');
     
-                    // Clear existing checkboxes to avoid duplication
                     const existingCheckboxes = form.querySelectorAll('input[name="accounts"]');
                     existingCheckboxes.forEach(checkbox => checkbox.parentElement.remove());
     
@@ -21,7 +117,7 @@
                         checkbox.type = 'checkbox';
                         checkbox.name = 'accounts';
                         checkbox.value = accountName;
-                        checkbox.checked = isCheckboxChecked(accountName);  // Restore checkbox state from local storage
+                        checkbox.checked = isCheckboxChecked(accountName);
                         checkbox.onchange = () => {
                             toggleTableVisibility(accountName);
                             saveCheckboxState(accountName, checkbox.checked);
@@ -61,11 +157,10 @@
                         .then(response => response.json())
                         .then(data => {
                             const orderDiv = document.getElementById('orderTablesDiv');
-                            orderDiv.innerHTML = ''; // Clear existing order tables
+                            orderDiv.innerHTML = '';
     
                             data.forEach((order, index) => {
                                 const table = document.createElement('table');
-                                table.border = 1;
     
                                 const headerRow = document.createElement('tr');
                                 const headerCell = document.createElement('th');
@@ -126,21 +221,19 @@
                     fetch('http://127.0.0.1:5000/getAccountInfo')
                         .then(response => response.json())
                         .then(accountInfoDict => {
-                            // Clear existing quantity/price tables to avoid duplication
                             const existingTables = form.querySelectorAll('table[id^="table_"]');
                             existingTables.forEach(table => table.remove());
     
                             accountNames.forEach((accountName, index) => {
-                                // Check if the table already exists
                                 let existingTable = document.getElementById(`table_${accountName}`);
                                 if (existingTable) {
-                                    return; // Skip creating a new table if it already exists
+                                    return;
                                 }
     
                                 const table = document.createElement('table');
                                 table.border = 1;
                                 table.id = `table_${accountName}`;
-                                table.style.display = isCheckboxChecked(accountName) ? 'table' : 'none'; // Show or hide based on local storage
+                                table.style.display = isCheckboxChecked(accountName) ? 'table' : 'none';
     
                                 const headerRow = document.createElement('tr');
                                 const headerCell = document.createElement('th');
@@ -201,6 +294,11 @@
     
                                 form.appendChild(table);
                             });
+                            
+                            const submitButton = document.createElement('input');
+                            submitButton.type = 'submit';
+                            submitButton.value = 'Submit';
+                            form.appendChild(submitButton);
                         })
                         .catch(error => console.error('Failed to fetch account info:', error));
                 })
@@ -214,7 +312,6 @@
             document.getElementById(`total_${index}`).textContent = total;
         }
     
-        // On page load, restore the checkbox states and other elements
         document.addEventListener('DOMContentLoaded', function() {
             addCheckboxes();
             addQuantityPriceTables();
@@ -222,29 +319,29 @@
         });
     </script>
 </head>
-<body onload="addCheckboxes(); addQuantityPriceTables(); loadOrderTables();">
+<body>
     <h2>Order Form</h2>
-    <form action="http://127.0.0.1:5000/order" method="POST" id="orderForm">
-        <label for="symbol">Symbol:</label><br>
-        <input type="text" id="symbol" name="symbol"><br>
-        <label for="order_type">Order Type:</label><br>
-        <select id="order_type" name="order_type">
-            <option value="LIMIT">LIMIT</option>
-            <option value="MARKET">MARKET</option>
-        </select><br>
-        <label for="instruction">Instruction:</label><br>
-        <select id="instruction" name="instruction">
-            <option value="BUY">BUY</option>
-            <option value="SELL">SELL</option>
-        </select><br>
-        <br>
-        <input type="submit" value="Submit">
-    </form>
+    <div class="container">
+        <form action="http://127.0.0.1:5000/order" method="POST" id="orderForm">
+            <label for="symbol">Symbol:</label>
+            <input type="text" id="symbol" name="symbol">
+            
+            <label for="order_type">Order Type:</label>
+            <select id="order_type" name="order_type">
+                <option value="LIMIT">LIMIT</option>
+                <option value="MARKET">MARKET</option>
+            </select>
+            
+            <label for="instruction">Instruction:</label>
+            <select id="instruction" name="instruction">
+                <option value="BUY">BUY</option>
+                <option value="SELL">SELL</option>
+            </select>
+        </form>
 
-    <br><br>
-
-    <div id="orderTablesDiv">
-        <!-- Order tables will be displayed here -->
+        <div id="orderTablesDiv" class="order-tables">
+            <!-- Order tables will be displayed here -->
+        </div>
     </div>
 </body>
 </html>
