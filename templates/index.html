@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Form with Tables</title>
+    <title>Charles Schwab API</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,7 +12,7 @@
             margin: 0;
             padding: 20px;
         }
-        
+
         h2 {
             text-align: center;
             color: #4CAF50;
@@ -20,55 +20,27 @@
 
         .container {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
             align-items: flex-start;
-            max-width: 1200px;
-            margin: 0 auto;
+            width: 100%;
+            margin: 0;
+            padding-left: 10px;
         }
 
-        form {
+        .form-container {
+            width: 45%;
+            margin-right: 20px;
+        }
+
+        .form-content {
             background-color: #fff;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 45%;
-        }
-
-        label {
-            font-weight: bold;
-            display: block;
-            margin: 10px 0 5px;
-        }
-
-        input[type="text"], select {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        input[type="number"] {
-            width: 90%;
-            padding: 5px;
-            margin-right: 5px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        input[type="submit"] {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 20px;
-        }
-
-        input[type="submit"]:hover {
-            background-color: #45a049;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow-x: hidden;
         }
 
         .order-tables {
@@ -76,19 +48,83 @@
             padding: 0 20px;
         }
 
+        form {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .checkbox-column {
+            width: 25%;
+            max-width: 250px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .checkbox-column label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-fields-column {
+            width: 75%;
+            padding: 10px;
+            flex-grow: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+
+        .form-fields-column label {
+            font-weight: bold;
+            margin: 10px 0 5px;
+        }
+
+        .form-fields-column input[type="text"], 
+        .form-fields-column select, 
+        .form-fields-column input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .form-fields-column input[type="number"] {
+            width: 90%;
+            padding: 5px;
+            margin-right: 5px;
+        }
+
+        .form-fields-column input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin-top: 20px;
+        }
+
+        .form-fields-column input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
-        }
-
-        table, th, td {
-            border: 1px solid #ddd;
+            table-layout: fixed;
         }
 
         th, td {
             padding: 12px;
             text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         th {
@@ -98,18 +134,23 @@
         .checkbox-container label {
             margin-right: 10px;
         }
+
     </style>
     <script>
+        let accountNames = [];
+        let accountInfoDict = {};
+        let orderData = [];
+
         function addCheckboxes() {
             fetch('http://127.0.0.1:5000/getAccountNames')
                 .then(response => response.json())
-                .then(accountNamesDict => {
-                    const accountNames = Object.keys(accountNamesDict);
+                .then(data => {
+                    accountNames = Object.keys(data);
                     const form = document.getElementById('orderForm');
-    
+
                     const existingCheckboxes = form.querySelectorAll('input[name="accounts"]');
                     existingCheckboxes.forEach(checkbox => checkbox.parentElement.remove());
-    
+
                     const fragment = document.createDocumentFragment();
                     accountNames.forEach(accountName => {
                         const label = document.createElement('label');
@@ -119,202 +160,224 @@
                         checkbox.value = accountName;
                         checkbox.checked = isCheckboxChecked(accountName);
                         checkbox.onchange = () => {
-                            toggleTableVisibility(accountName);
-                            saveCheckboxState(accountName, checkbox.checked);
+                            updateQuantityPriceTable();
+                            loadOrderTables(); // Update order tables on checkbox change
                         };
                         label.appendChild(checkbox);
                         label.appendChild(document.createTextNode(accountName));
                         fragment.appendChild(label);
                         fragment.appendChild(document.createElement('br'));
                     });
-    
-                    form.insertBefore(fragment, form.firstChild);
+
+                    const checkboxColumn = document.querySelector('.checkbox-column');
+                    checkboxColumn.appendChild(fragment);
+                    updateQuantityPriceTable(); // Update table after adding checkboxes
                 })
                 .catch(error => console.error('Failed to fetch account names:', error));
         }
-    
+
         function isCheckboxChecked(accountName) {
             return localStorage.getItem(`checkbox_${accountName}`) === 'true';
         }
-    
+
         function saveCheckboxState(accountName, isChecked) {
             localStorage.setItem(`checkbox_${accountName}`, isChecked);
         }
-    
-        function toggleTableVisibility(accountName) {
-            const table = document.getElementById(`table_${accountName}`);
-            if (table) {
-                table.style.display = table.style.display === 'none' ? 'table' : 'none';
-            }
-        }
-    
-        function loadOrderTables() {
-            fetch('http://127.0.0.1:5000/getAccountNames')
+
+        function updateQuantityPriceTable() {
+            fetch('http://127.0.0.1:5000/getAccountInfo')
                 .then(response => response.json())
-                .then(accountNamesDict => {
-                    const accountNames = Object.keys(accountNamesDict);
-                    return fetch('http://127.0.0.1:5000/getOrder')
-                        .then(response => response.json())
-                        .then(data => {
-                            const orderDiv = document.getElementById('orderTablesDiv');
-                            orderDiv.innerHTML = '';
-    
-                            data.forEach((order, index) => {
-                                const table = document.createElement('table');
-    
-                                const headerRow = document.createElement('tr');
-                                const headerCell = document.createElement('th');
-                                headerCell.colSpan = 5;
-                                headerCell.textContent = accountNames[index] || `Account ${index + 1}`;
-                                headerRow.appendChild(headerCell);
-                                table.appendChild(headerRow);
-    
-                                const headers = ['Tinker', 'Quantity', 'Price', 'Instruction', 'Status'];
-                                const headerRow2 = document.createElement('tr');
-                                headers.forEach(headerText => {
-                                    const header = document.createElement('th');
-                                    header.textContent = headerText;
-                                    headerRow2.appendChild(header);
-                                });
-                                table.appendChild(headerRow2);
-    
-                                order.forEach(item => {
-                                    const row = document.createElement('tr');
-                                    const tinkerCell = document.createElement('td');
-                                    tinkerCell.textContent = item.orderLegCollection[0].instrument.symbol;
-                                    row.appendChild(tinkerCell);
-    
-                                    const quantityCell = document.createElement('td');
-                                    quantityCell.textContent = item.quantity;
-                                    row.appendChild(quantityCell);
-    
-                                    const priceCell = document.createElement('td');
-                                    priceCell.textContent = item.price;
-                                    row.appendChild(priceCell);
-    
-                                    const instrCell = document.createElement('td');
-                                    instrCell.textContent = item.orderLegCollection[0].instruction;
-                                    row.appendChild(instrCell);
-    
-                                    const statCell = document.createElement('td');
-                                    statCell.textContent = item.status;
-                                    row.appendChild(statCell);
-    
-                                    table.appendChild(row);
-                                });
-    
-                                orderDiv.appendChild(table);
-                            });
-                        })
-                        .catch(error => alert('Failed to fetch orders: ' + error));
-                })
-                .catch(error => alert('Failed to fetch account names: ' + error));
-        }
-    
-        function addQuantityPriceTables() {
-            fetch('http://127.0.0.1:5000/getAccountNames')
-                .then(response => response.json())
-                .then(accountNamesDict => {
-                    const accountNames = Object.keys(accountNamesDict);
+                .then(data => {
+                    accountInfoDict = data;
                     const form = document.getElementById('orderForm');
-    
-                    fetch('http://127.0.0.1:5000/getAccountInfo')
-                        .then(response => response.json())
-                        .then(accountInfoDict => {
-                            const existingTables = form.querySelectorAll('table[id^="table_"]');
-                            existingTables.forEach(table => table.remove());
-    
-                            accountNames.forEach((accountName, index) => {
-                                let existingTable = document.getElementById(`table_${accountName}`);
-                                if (existingTable) {
-                                    return;
-                                }
-    
-                                const table = document.createElement('table');
-                                table.border = 1;
-                                table.id = `table_${accountName}`;
-                                table.style.display = isCheckboxChecked(accountName) ? 'table' : 'none';
-    
-                                const headerRow = document.createElement('tr');
-                                const headerCell = document.createElement('th');
-                                headerCell.colSpan = 4;
-                                headerCell.textContent = `${accountName} - Quantity, Price, and Balance`;
-                                headerRow.appendChild(headerCell);
-                                table.appendChild(headerRow);
-    
-                                const headerRow2 = document.createElement('tr');
-                                const headers = ['Quantity', 'Price per item', 'Total Cost', 'Account Balance'];
-                                headers.forEach(headerText => {
-                                    const header = document.createElement('th');
-                                    header.textContent = headerText;
-                                    headerRow2.appendChild(header);
-                                });
-                                table.appendChild(headerRow2);
-    
-                                const row = document.createElement('tr');
-                                const quantityCell = document.createElement('td');
-                                const priceCell = document.createElement('td');
-                                const totalCell = document.createElement('td');
-                                const balanceCell = document.createElement('td');
-    
-                                const quantityInput = document.createElement('input');
-                                quantityInput.type = 'number';
-                                quantityInput.name = `${accountName}_quantity`;
-                                quantityInput.id = `quantity_${index}`;
-                                quantityInput.value = 0;
-                                quantityInput.required = true;
-                                quantityInput.oninput = () => calculateTotal(index);
-                                quantityCell.appendChild(quantityInput);
-    
-                                const priceInput = document.createElement('input');
-                                priceInput.type = 'number';
-                                priceInput.name = `${accountName}_price`;
-                                priceInput.id = `price_${index}`;
-                                priceInput.value = 0;
-                                priceInput.step = '0.01';
-                                priceInput.required = true;
-                                priceInput.oninput = () => calculateTotal(index);
-                                priceCell.appendChild(priceInput);
-    
-                                const totalSpan = document.createElement('span');
-                                totalSpan.id = `total_${index}`;
-                                totalSpan.textContent = '0.00';
-                                totalCell.appendChild(totalSpan);
-    
-                                const balanceSpan = document.createElement('span');
-                                balanceSpan.id = `balance_${index}`;
-                                balanceSpan.textContent = "$" + (accountInfoDict[accountName].securitiesAccount.currentBalances.cashBalance || '0.00');
-                                balanceCell.appendChild(balanceSpan);
-    
-                                row.appendChild(quantityCell);
-                                row.appendChild(priceCell);
-                                row.appendChild(totalCell);
-                                row.appendChild(balanceCell);
-                                table.appendChild(row);
-    
-                                form.appendChild(table);
-                            });
-                            
-                            const submitButton = document.createElement('input');
-                            submitButton.type = 'submit';
-                            submitButton.value = 'Submit';
-                            form.appendChild(submitButton);
-                        })
-                        .catch(error => console.error('Failed to fetch account info:', error));
+                    let table = document.getElementById('quantityPriceTable');
+
+                    if (table) {
+                        table.remove(); // Remove the existing table
+                    }
+
+                    table = document.createElement('table');
+                    table.border = 1;
+                    table.id = 'quantityPriceTable';
+
+                    const headerRow = document.createElement('tr');
+                    const headers = ['Account ID', 'Quantity', 'Price', 'Total Cost', 'Available Balance'];
+                    headers.forEach(headerText => {
+                        const header = document.createElement('th');
+                        header.textContent = headerText;
+                        headerRow.appendChild(header);
+                    });
+                    table.appendChild(headerRow);
+
+                    accountNames.forEach((accountName, index) => {
+                        console.log(accountInfoDict[accountName]);
+                        if (document.querySelector(`input[name="accounts"][value="${accountName}"]`).checked) {
+                            const row = document.createElement('tr');
+
+                            const accountIdCell = document.createElement('td');
+                            accountIdCell.textContent = accountName;
+                            row.appendChild(accountIdCell);
+
+                            const quantityCell = document.createElement('td');
+                            const quantityInput = document.createElement('input');
+                            quantityInput.type = 'number';
+                            quantityInput.name = `${accountName}_quantity`;
+                            quantityInput.id = `quantity_${index}`;
+                            quantityInput.value = 0;
+                            quantityInput.required = true;
+                            quantityInput.oninput = () => calculateTotal(index);
+                            quantityCell.appendChild(quantityInput);
+                            row.appendChild(quantityCell);
+
+                            const priceCell = document.createElement('td');
+                            const priceInput = document.createElement('input');
+                            priceInput.type = 'number';
+                            priceInput.name = `${accountName}_price`;
+                            priceInput.id = `price_${index}`;
+                            priceInput.value = 0;
+                            priceInput.step = '0.01';
+                            priceInput.required = true;
+                            priceInput.oninput = () => calculateTotal(index);
+                            priceCell.appendChild(priceInput);
+                            row.appendChild(priceCell);
+
+                            const totalCell = document.createElement('td');
+                            const totalSpan = document.createElement('span');
+                            totalSpan.id = `total_${index}`;
+                            totalSpan.textContent = '0.00';
+                            totalCell.appendChild(totalSpan);
+                            row.appendChild(totalCell);
+
+                            const balanceCell = document.createElement('td');
+                            const balanceSpan = document.createElement('span');
+                            balanceSpan.id = `balance_${index}`;
+                            //balanceSpan.textContent = "$" + (accountInfoDict[accountName].securitiesAccount.currentBalances.cashBalance || '0.00');   This is overall cash balance
+                            balanceSpan.textContent = "$" + (accountInfoDict[accountName].securitiesAccount.projectedBalances.cashAvailableForTrading || '0.00'); // This is cash available for trading
+                            balanceCell.appendChild(balanceSpan);
+                            row.appendChild(balanceCell);
+
+                            table.appendChild(row);
+                        }
+                    });
+
+                    const formFieldsColumn = document.querySelector('.form-fields-column');
+                    formFieldsColumn.appendChild(table);
+
+                    let submitButton = document.getElementById('submitButton');
+                    if (!submitButton) {
+                        submitButton = document.createElement('input');
+                        submitButton.type = 'submit';
+                        submitButton.value = 'Submit';
+                        submitButton.id = 'submitButton';
+                        submitButton.style.display = 'block';
+                        formFieldsColumn.appendChild(submitButton);
+                    } else {
+                        formFieldsColumn.appendChild(submitButton);
+                    }
                 })
-                .catch(error => console.error('Failed to fetch account names:', error));
+                .catch(error => console.error('Failed to fetch account info:', error));
         }
-    
+
         function calculateTotal(index) {
             const quantity = document.getElementById(`quantity_${index}`).value;
             const price = document.getElementById(`price_${index}`).value;
             const total = (quantity * price).toFixed(2);
             document.getElementById(`total_${index}`).textContent = total;
         }
-    
-        document.addEventListener('DOMContentLoaded', function() {
+
+        function loadOrderTables() {
+            fetch('http://127.0.0.1:5000/getAccountNames')
+                .then(response => response.json())
+                .then(data => {
+                    const accountNames = Object.keys(data);
+                    const checkedAccounts = accountNames.filter(accountName => 
+                        document.querySelector(`input[name="accounts"][value="${accountName}"]`).checked
+                    );
+
+                    if (checkedAccounts.length === 0) {
+                        document.getElementById('orderTablesDiv').innerHTML = ''; // Clear if no account is selected
+                        return;
+                    }
+
+                    fetch('http://127.0.0.1:5000/getOrder')
+                        .then(response => response.json())
+                        .then(orderData => {
+                            const orderDiv = document.getElementById('orderTablesDiv');
+                            orderDiv.innerHTML = ''; // Clear existing order tables
+
+                            let ordersGroupedByAccount = {};
+
+                            // Group orders by account ID
+                            orderData.forEach((orders, index) => {
+                                orders.forEach(item => {
+                                    const accountId = accountNames[index] || `Account ${index + 1}`;
+                                    if (checkedAccounts.includes(accountId)) {
+                                        if (!ordersGroupedByAccount[accountId]) {
+                                            ordersGroupedByAccount[accountId] = [];
+                                        }
+                                        ordersGroupedByAccount[accountId].push(item);
+                                    }
+                                });
+                            });
+
+                            const table = document.createElement('table');
+                            table.border = 1;
+
+                            const headerRow = document.createElement('tr');
+                            const headers = ['Account ID', 'Tinker', 'Quantity', 'Price', 'Instruction', 'Status'];
+                            headers.forEach(headerText => {
+                                const header = document.createElement('th');
+                                header.textContent = headerText;
+                                headerRow.appendChild(header);
+                            });
+                            table.appendChild(headerRow);
+
+                            // Create rows for each account's orders
+                            for (const [accountId, orders] of Object.entries(ordersGroupedByAccount)) {
+                                orders.forEach((item, index) => {
+                                    const row = document.createElement('tr');
+
+                                    if (index === 0) { // Span only on the first row for this account
+                                        const accountIdCell = document.createElement('td');
+                                        accountIdCell.textContent = accountId;
+                                        accountIdCell.rowSpan = orders.length;
+                                        row.appendChild(accountIdCell);
+                                    }
+
+                                    // Create and append the other cells
+                                    const tinkerCell = document.createElement('td');
+                                    tinkerCell.textContent = item.orderLegCollection[0].instrument.symbol;
+                                    row.appendChild(tinkerCell);
+
+                                    const quantityCell = document.createElement('td');
+                                    quantityCell.textContent = item.quantity;
+                                    row.appendChild(quantityCell);
+
+                                    const priceCell = document.createElement('td');
+                                    priceCell.textContent = item.price;
+                                    row.appendChild(priceCell);
+
+                                    const instrCell = document.createElement('td');
+                                    instrCell.textContent = item.orderLegCollection[0].instruction;
+                                    row.appendChild(instrCell);
+
+                                    const statCell = document.createElement('td');
+                                    statCell.textContent = item.status;
+                                    row.appendChild(statCell);
+
+                                    table.appendChild(row);
+                                });
+                            }
+
+                            orderDiv.appendChild(table);
+                        })
+                        .catch(error => alert('Failed to fetch orders: ' + error));
+                })
+                .catch(error => alert('Failed to fetch account names: ' + error));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
             addCheckboxes();
-            addQuantityPriceTables();
             loadOrderTables();
         });
     </script>
@@ -322,25 +385,35 @@
 <body>
     <h2>Order Form</h2>
     <div class="container">
-        <form action="http://127.0.0.1:5000/order" method="POST" id="orderForm">
-            <label for="symbol">Symbol:</label>
-            <input type="text" id="symbol" name="symbol">
-            
-            <label for="order_type">Order Type:</label>
-            <select id="order_type" name="order_type">
-                <option value="LIMIT">LIMIT</option>
-                <option value="MARKET">MARKET</option>
-            </select>
-            
-            <label for="instruction">Instruction:</label>
-            <select id="instruction" name="instruction">
-                <option value="BUY">BUY</option>
-                <option value="SELL">SELL</option>
-            </select>
-        </form>
-
-        <div id="orderTablesDiv" class="order-tables">
-            <!-- Order tables will be displayed here -->
+        <div class="form-container">
+            <div class="form-content">
+                <form id="orderForm" action="http://127.0.0.1:5000/order" method="POST">
+                    <div class="checkbox-column">
+                        <!-- Checkboxes will be dynamically added here -->
+                    </div>
+                    <div class="form-fields-column">
+                        <label for="symbol">Symbol:</label>
+                        <input type="text" id="symbol" name="symbol" required>
+                        
+                        <label for="order_type">Order Type:</label>
+                        <select id="order_type" name="order_type" required>
+                            <option value="LIMIT">LIMIT</option>
+                            <option value="MARKET">MARKET</option>
+                        </select>
+                        
+                        <label for="instruction">Instruction:</label>
+                        <select id="instruction" name="instruction" required>
+                            <option value="BUY">BUY</option>
+                            <option value="SELL">SELL</option>
+                        </select>
+                        
+                        <!-- Form fields and submit button will be dynamically added here -->
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="order-tables" id="orderTablesDiv">
+            <!-- Order tables will be dynamically added here -->
         </div>
     </div>
 </body>
