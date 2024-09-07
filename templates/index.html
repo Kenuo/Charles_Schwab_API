@@ -188,6 +188,7 @@
             fetch('http://127.0.0.1:5000/getAccountInfo')
                 .then(response => response.json())
                 .then(data => {
+                    //console.log(data);
                     accountInfoDict = data;
                     const form = document.getElementById('orderForm');
                     let table = document.getElementById('quantityPriceTable');
@@ -210,7 +211,7 @@
                     table.appendChild(headerRow);
 
                     accountNames.forEach((accountName, index) => {
-                        console.log(accountInfoDict[accountName]);
+                        //console.log(accountInfoDict[accountName]);
                         if (document.querySelector(`input[name="accounts"][value="${accountName}"]`).checked) {
                             const row = document.createElement('tr');
 
@@ -251,8 +252,9 @@
                             const balanceCell = document.createElement('td');
                             const balanceSpan = document.createElement('span');
                             balanceSpan.id = `balance_${index}`;
+                            balanceSpan.textContent = "$" + (accountInfoDict[accountName].securitiesAccount.projectedBalances.cashAvailableForTrading || accountInfoDict[accountName].securitiesAccount.currentBalances.availableFunds || '0.00');
                             //balanceSpan.textContent = "$" + (accountInfoDict[accountName].securitiesAccount.currentBalances.cashBalance || '0.00');   This is overall cash balance
-                            balanceSpan.textContent = "$" + (accountInfoDict[accountName].securitiesAccount.projectedBalances.cashAvailableForTrading || '0.00'); // This is cash available for trading
+                            //balanceSpan.textContent = "$" + (accountInfoDict[accountName].securitiesAccount.projectedBalances.cashAvailableForTrading || '0.00'); // This is cash available for trading
                             balanceCell.appendChild(balanceSpan);
                             row.appendChild(balanceCell);
 

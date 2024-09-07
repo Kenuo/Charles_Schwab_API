@@ -61,6 +61,22 @@ def get_accounts(access_token):
     accounts_list = response_frame.set_index('accountNumber')['hashValue'].to_dict()
     return accounts_list
 
+def get_positions(access_token):
+    access_token = get_access_token()
+    accounts_list = get_accounts(access_token)
+
+    account_info = {}
+    for account, account_hash_value in accounts_list.items():
+        account_info[account] = requests.get(
+            url=f"https://api.schwabapi.com/trader/v1/accounts/{account_hash_value}",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"fields": "positions"}
+        ).json()
+    
+    return account_info
+    
+
+
 def design_order(symbol, order_type, instruction, quantity, price, leg_id="1", order_leg_type="EQUITY", asset_type="EQUITY"):
     return {
         "price": price,
@@ -167,4 +183,5 @@ def getOrder():
 
 
 if __name__ == '__main__':
+   print(get_positions(get_access_token()))
    app.run(port=5000)
