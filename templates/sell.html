@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Charles Schwab API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #4CAF50;
+        }
+
+        .container {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+            width: 100%;
+            margin: 0;
+            padding-left: 10px;
+        }
+
+        .form-container {
+            width: 45%;
+            margin-right: 20px;
+        }
+
+        .form-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow-x: hidden;
+        }
+
+        .order-tables {
+            width: 50%;
+            padding: 0 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .checkbox-column {
+            width: 25%;
+            max-width: 250px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .checkbox-column label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-fields-column {
+            width: 75%;
+            padding: 10px;
+            flex-grow: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+
+        .form-fields-column label {
+            font-weight: bold;
+            margin: 10px 0 5px;
+        }
+
+        .form-fields-column input[type="text"], 
+        .form-fields-column select, 
+        .form-fields-column input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .form-fields-column input[type="number"] {
+            width: 90%;
+            padding: 5px;
+            margin-right: 5px;
+        }
+
+        .form-fields-column input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin-top: 20px;
+        }
+
+        .form-fields-column input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            table-layout: fixed;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .checkbox-container label {
+            margin-right: 10px;
+        }
+
+    </style>
+    <script>
+        let accountNames = [];
+        let accountInfoDict = {};
+        let orderData = [];
+
+    // Debounce symbol input event
+    const debounce = (func, wait) => {
+                let timeout;
+                return (...args) => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func(...args), wait);
+                };
+            };
+
+        async function addCheckboxes() {
+    const data = await fetchData('http://127.0.0.1:5000/getAccountNames');
+    accountNames = Object.keys(data);
+    const form = document.getElementById('orderForm');
+
+    const existingCheckboxes = form.querySelectorAll('input[name="accounts"]');
+    existingCheckboxes.forEach(checkbox => checkbox.parentElement.remove());
+
+    const fragment = document.createDocumentFragment();
+    accountNames.forEach(accountName => {
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'accounts';
+        checkbox.value = accountName;
+        checkbox.checked = isCheckboxChecked(accountName);
+        checkbox.onchange = () => {
+            updateQuantityPriceTable();
+            loadOrderTables(); // Update order tables on checkbox change
+        };
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(accountName));
+        fragment.appendChild(label);
+        fragment.appendChild(document.createElement('br'));
+    });
+
+    const checkboxColumn = document.querySelector('.checkbox-column');
+    checkboxColumn.appendChild(fragment);
+    updateQuantityPriceTable(); // Update table after adding checkboxes
+}
+
+
+        function isCheckboxChecked(accountName) {
+            return localStorage.getItem(`checkbox_${accountName}`) === 'true';
+        }
+
+        function saveCheckboxState(accountName, isChecked) {
+            localStorage.setItem(`checkbox_${accountName}`, isChecked);
+        }
+
+        async function updateQuantityPriceTable() {
+    const [accountInfoDict, positionsData] = await Promise.all([
+        fetchData('http://127.0.0.1:5000/getAccountInfo'),
+        fetchData('http://127.0.0.1:5000/getPositions')
+    ]);
+
+    const form = document.getElementById('orderForm');
+    let table = document.getElementById('quantityPriceTable');
+
+    if (table) {
+        table.remove(); // Remove the existing table
+    }
+
+    table = document.createElement('table');
+    table.border = 1;
+    table.id = 'quantityPriceTable';
+
+    const headerRow = document.createElement('tr');
+    const headers = ['Account ID', 'Quantity', 'Price', 'Total Cost', 'Positions Held'];
+    headers.forEach(headerText => {
+        const header = document.createElement('th');
+        header.textContent = headerText;
+        headerRow.appendChild(header);
+    });
+    table.appendChild(headerRow);
+
+    accountNames.forEach((accountName, index) => {
+        if (document.querySelector(`input[name="accounts"][value="${accountName}"]`).checked) {
+            const row = document.createElement('tr');
+
+            const accountIdCell = document.createElement('td');
+            accountIdCell.textContent = accountName;
+            row.appendChild(accountIdCell);
+
+            const quantityCell = document.createElement('td');
+            const quantityInput = document.createElement('input');
+            quantityInput.type = 'number';
+            quantityInput.name = `${accountName}_quantity`;
+            quantityInput.id = `quantity_${index}`;
+            quantityInput.value = 0;
+            quantityInput.required = true;
+            quantityInput.oninput = () => calculateTotal(index);
+            quantityCell.appendChild(quantityInput);
+            row.appendChild(quantityCell);
+
+            const priceCell = document.createElement('td');
+            const priceInput = document.createElement('input');
+            priceInput.type = 'number';
+            priceInput.name = `${accountName}_price`;
+            priceInput.id = `price_${index}`;
+            priceInput.value = 0;
+            priceInput.step = '0.01';
+            priceInput.required = true;
+            priceInput.oninput = () => calculateTotal(index);
+            priceCell.appendChild(priceInput);
+            row.appendChild(priceCell);
+
+            const totalCell = document.createElement('td');
+            const totalSpan = document.createElement('span');
+            totalSpan.id = `total_${index}`;
+            totalSpan.textContent = '0.00';
+            totalCell.appendChild(totalSpan);
+            row.appendChild(totalCell);
+
+            const positionsCell = document.createElement('td');
+            const positionsSpan = document.createElement('span');
+            positionsSpan.id = `positions_${index}`;
+            const symbol = document.getElementById('symbol').value.toUpperCase();
+            let positionQuantity = '0'; // Default to '0' if no position found
+
+            if (positionsData[accountName] && positionsData[accountName].securitiesAccount.positions) {
+                const position = positionsData[accountName].securitiesAccount.positions.find(p => p.instrument.symbol === symbol);
+                if (position) {
+                    positionQuantity = position.longQuantity;
+                }
+            }
+
+            positionsSpan.textContent = positionQuantity;
+            positionsCell.appendChild(positionsSpan);
+            row.appendChild(positionsCell);
+
+            table.appendChild(row);
+        }
+    });
+
+    const formFieldsColumn = document.querySelector('.form-fields-column');
+    formFieldsColumn.appendChild(table);
+
+    let submitButton = document.getElementById('submitButton');
+    if (!submitButton) {
+        submitButton = document.createElement('input');
+        submitButton.type = 'submit';
+        submitButton.value = 'Submit';
+        submitButton.id = 'submitButton';
+        submitButton.style.display = 'block';
+        formFieldsColumn.appendChild(submitButton);
+    } else {
+        formFieldsColumn.appendChild(submitButton);
+    }
+}
+
+
+
+        function calculateTotal(index) {
+            const quantity = document.getElementById(`quantity_${index}`).value;
+            const price = document.getElementById(`price_${index}`).value;
+            const total = (quantity * price).toFixed(2);
+            document.getElementById(`total_${index}`).textContent = total;
+        }
+
+
+        async function loadOrderTables() {
+    try {
+        // Fetch account names
+        const accountNames = await fetchData('http://127.0.0.1:5000/getAccountNames');
+        if (!accountNames) throw new Error('Failed to fetch account names');
+
+        // Filter checked accounts
+        const checkedAccounts = Object.keys(accountNames).filter(accountName => 
+            document.querySelector(`input[name="accounts"][value="${accountName}"]`).checked
+        );
+
+        if (checkedAccounts.length === 0) {
+            document.getElementById('orderTablesDiv').innerHTML = ''; // Clear if no account is selected
+            return;
+        }
+
+        // Fetch order data
+        const orderData = await fetchData('http://127.0.0.1:5000/getOrder');
+        if (!orderData) throw new Error('Failed to fetch order data');
+
+        // Prepare to display order tables
+        const orderDiv = document.getElementById('orderTablesDiv');
+        orderDiv.innerHTML = ''; // Clear existing order tables
+
+        let ordersGroupedByAccount = {};
+
+        // Group orders by account ID
+        orderData.forEach((orders, index) => {
+            orders.forEach(item => {
+                const accountId = Object.keys(accountNames)[index] || `Account ${index + 1}`;
+                if (checkedAccounts.includes(accountId)) {
+                    if (!ordersGroupedByAccount[accountId]) {
+                        ordersGroupedByAccount[accountId] = [];
+                    }
+                    ordersGroupedByAccount[accountId].push(item);
+                }
+            });
+        });
+
+        // Create the table
+        const table = document.createElement('table');
+        table.border = 1;
+
+        // Table headers
+        const headerRow = document.createElement('tr');
+        const headers = ['Account ID', 'Symbol', 'Quantity', 'Price', 'Instruction', 'Status'];
+        headers.forEach(headerText => {
+            const header = document.createElement('th');
+            header.textContent = headerText;
+            headerRow.appendChild(header);
+        });
+        table.appendChild(headerRow);
+
+        // Populate table rows
+        for (const accountId in ordersGroupedByAccount) {
+            ordersGroupedByAccount[accountId].forEach(order => {
+                const row = document.createElement('tr');
+
+                const accountIdCell = document.createElement('td');
+                accountIdCell.textContent = accountId;
+                row.appendChild(accountIdCell);
+
+                const symbolCell = document.createElement('td');
+                symbolCell.textContent = order.orderLegCollection[0].instrument.symbol;
+                row.appendChild(symbolCell);
+
+                const quantityCell = document.createElement('td');
+                quantityCell.textContent = order.quantity;
+                row.appendChild(quantityCell);
+
+                const priceCell = document.createElement('td');
+                priceCell.textContent = order.price;
+                row.appendChild(priceCell);
+
+                const instructionCell = document.createElement('td');
+                instructionCell.textContent = order.orderLegCollection[0].instruction;
+                row.appendChild(instructionCell);
+
+                const statusCell = document.createElement('td');
+                statusCell.textContent = order.status;
+                row.appendChild(statusCell);
+
+                table.appendChild(row);
+            });
+        }
+
+        orderDiv.appendChild(table);
+
+    } catch (error) {
+        console.error('Error loading order tables:', error);
+        document.getElementById('orderTablesDiv').innerHTML = 'Failed to load order data.';
+    }
+}
+
+        document.addEventListener('DOMContentLoaded', () => {
+            addCheckboxes();
+            loadOrderTables();
+            const symbolInput = document.getElementById('symbol');
+
+            symbolInput.addEventListener('input', debounce(() => {
+                const enteredSymbol = symbolInput.value.trim().toUpperCase();  // Get the entered symbol
+                updatePositionsHeldColumn(enteredSymbol);  // Call the function to update the table
+            }, 300)); // Adjust debounce wait time as needed
+        });
+
+        async function fetchData(url) {
+            try {
+                const response = await fetch(url);
+                return await response.json();
+            } catch (error) {
+                console.error(`Failed to fetch from ${url}:`, error);
+                return {};
+            }
+        }
+
+function updatePositionsHeldColumn(symbol) {
+    fetch('http://127.0.0.1:5000/getPositions')  // Fetch positions data
+        .then(response => response.json())
+        .then(positionsData => {
+            accountNames.forEach((accountName, index) => {
+                const positionsCell = document.getElementById(`positions_${index}`);
+                
+                if (!positionsCell) return; // Skip if there's no cell
+
+                if (positionsData[accountName] && positionsData[accountName].securitiesAccount.positions) {
+                    const positions = positionsData[accountName].securitiesAccount.positions;
+                    let positionQuantity = '0'; // Default to '0' if no position is found
+
+                    // Loop through positions to find the one matching the symbol
+                    positions.forEach(position => {
+                        if (position.instrument.symbol.toUpperCase() === symbol.toUpperCase()) {
+                            positionQuantity = position.longQuantity || '0';
+                        }
+                    });
+
+                    // Show the actual position quantity or '0' if the symbol is not found
+                    positionsCell.textContent = positionQuantity;
+                } else {
+                    positionsCell.textContent = '0'; // If no positions found, set to '0'
+                }
+            });
+        })
+        .catch(error => console.error('Failed to fetch positions data:', error));
+}
+
+
+
+    </script>
+</head>
+<body>
+    <h2>Order Form</h2>
+    <div class="container">
+        <div class="form-container">
+            <div class="form-content">
+                <form id="orderForm" action="http://127.0.0.1:5000/order" method="POST">
+                    <div class="checkbox-column">
+                        <!-- Checkboxes will be dynamically added here -->
+                    </div>
+                    <div class="form-fields-column">
+                        <label for="symbol">Symbol:</label>
+                        <input type="text" id="symbol" name="symbol" required>
+                        
+                        <label for="order_type">Order Type:</label>
+                        <select id="order_type" name="order_type" required>
+                            <option value="LIMIT">LIMIT</option>
+                            <option value="MARKET">MARKET</option>
+                        </select>
+                        
+                        <label for="instruction">Instruction:</label>
+                        <select id="instruction" name="instruction" required>
+                            <option value="BUY">BUY</option>
+                            <option value="SELL">SELL</option>
+                        </select>
+                        
+                        <!-- Form fields and submit button will be dynamically added here -->
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="order-tables" id="orderTablesDiv">
+            <!-- Order tables will be dynamically added here -->
+        </div>
+    </div>
+</body>
+</html>
