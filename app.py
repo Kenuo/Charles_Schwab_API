@@ -38,7 +38,7 @@ def trying():
 
 @app.route('/test')
 def test():
-    return render_template('test.html')
+    return render_template('sell.html')
 
 
 @app.route('/')
@@ -52,7 +52,8 @@ def get_access_token():
         access_token = f.readline().strip()
     return access_token
 
-def get_accounts(access_token):
+def get_accounts():
+    access_token = get_access_token()
     account_data = requests.get(
         url="https://api.schwabapi.com/trader/v1/accounts/accountNumbers",
         headers={"Authorization": f"Bearer {access_token}"}
@@ -60,21 +61,6 @@ def get_accounts(access_token):
     response_frame = pandas.json_normalize(account_data.json())
     accounts_list = response_frame.set_index('accountNumber')['hashValue'].to_dict()
     return accounts_list
-
-def get_positions(access_token):
-    access_token = get_access_token()
-    accounts_list = get_accounts(access_token)
-
-    account_info = {}
-    for account, account_hash_value in accounts_list.items():
-        account_info[account] = requests.get(
-            url=f"https://api.schwabapi.com/trader/v1/accounts/{account_hash_value}",
-            headers={"Authorization": f"Bearer {access_token}"},
-            params={"fields": "positions"}
-        ).json()
-    
-    return account_info
-    
 
 
 def design_order(symbol, order_type, instruction, quantity, price, leg_id="1", order_leg_type="EQUITY", asset_type="EQUITY"):
@@ -120,7 +106,7 @@ def order():
                 account_q_and_p.setdefault(account_name, {})['price'] = float(request.form.get(key))
 
         access_token = get_access_token()
-        accounts_list = get_accounts(access_token)
+        accounts_list = get_accounts()
 
         for account in accounts:
             account_hash_value = accounts_list.get(account)
@@ -145,13 +131,13 @@ def order():
 @app.route('/getAccountNames', methods=['GET']) 
 def getAccountNames():
     access_token = get_access_token()
-    accounts_list = get_accounts(access_token)
+    accounts_list = get_accounts()
     return accounts_list
 
 @app.route('/getAccountInfo', methods=['GET']) 
 def getAccountInfo():
     access_token = get_access_token()
-    accounts_list = get_accounts(access_token)
+    accounts_list = get_accounts()
 
     account_info = {}
     for account, account_hash_value in accounts_list.items():
@@ -162,10 +148,25 @@ def getAccountInfo():
     
     return account_info
 
+@app.route('/getPositions', methods=['GET'])
+def get_positions():
+    access_token = get_access_token()
+    accounts_list = get_accounts()
+
+    account_info = {}
+    for account, account_hash_value in accounts_list.items():
+        account_info[account] = requests.get(
+            url=f"https://api.schwabapi.com/trader/v1/accounts/{account_hash_value}",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"fields": "positions"}
+        ).json()
+    
+    return account_info
+
 @app.route('/getOrder', methods=['GET'])
 def getOrder():
     access_token = get_access_token()
-    accounts_list = get_accounts(access_token)
+    accounts_list = get_accounts()
 
     today = f"{date.today()}T00:00:00.000Z"
     end_of_day = f"{date.today()}T23:59:59.000Z"
@@ -183,5 +184,4 @@ def getOrder():
 
 
 if __name__ == '__main__':
-   print(get_positions(get_access_token()))
    app.run(port=5000)
